@@ -1561,7 +1561,7 @@ async function adminDeleteAllDoneTasks() {
   allTasks = allTasks.filter(t => t.status !== 'done');
   renderAdminTasks();
   renderTasks && renderTasks();
-  showToast(\`\${doneTasks.length} görev silindi\`);
+  showToast(doneTasks.length + ' görev silindi');
 }
 
 function adminManageTaskFiles(taskId) {
