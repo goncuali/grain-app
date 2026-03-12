@@ -1510,39 +1510,31 @@ function renderAdminTasks() {
   if (!allTasks.length) {
     el.innerHTML = '<div class="empty"><p>Görev yok</p></div>'; return;
   }
-  el.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-      <button onclick="adminDeleteAllDoneTasks()" style="padding:8px 14px;border-radius:8px;background:transparent;border:1px solid var(--red)66;color:var(--red);font-size:.8rem;cursor:pointer">
-        🗑 Tüm Biten Görevleri Sil
-      </button>
-    </div>
-    ${allTasks.map(t => {
-      const assignedNames = (t.assigned_to||[]).map(uid => {
-        const p = allProfiles.find(x => x.id === uid);
-        return p ? p.name.split(' ')[0] : '?';
-      }).join(', ');
-      const statusColor = t.status === 'done' ? 'var(--green)' : t.status === 'doing' ? 'var(--orange)' : 'var(--textMuted)';
-      const statusLabel = t.status === 'done' ? 'Bitti' : t.status === 'doing' ? 'Devam' : 'Bekliyor';
-      const fileCount = (t.attachments || []).length;
-      return \`<div class="admin-row" style="align-items:start">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:.88rem;color:var(--text);margin-bottom:4px">\${esc(t.title)}</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <span style="font-size:.72rem;color:\${statusColor}">● \${statusLabel}</span>
-            \${assignedNames ? \`<span style="font-size:.72rem;color:var(--textMuted)">👤 \${esc(assignedNames)}</span>\` : ''}
-            \${fileCount ? \`<span style="font-size:.72rem;color:var(--textMuted);cursor:pointer" onclick="adminManageTaskFiles('\${t.id}')">📎 \${fileCount} dosya</span>\` : ''}
-            \${t.due_date ? \`<span style="font-size:.72rem;color:var(--textMuted)">📅 \${formatDate(t.due_date)}</span>\` : ''}
-          </div>
-        </div>
-        <div style="display:flex;gap:6px;flex-shrink:0;margin-top:2px">
-          \${fileCount ? \`<button onclick="adminManageTaskFiles('\${t.id}')" style="padding:5px 10px;border-radius:6px;background:transparent;border:1px solid var(--border2);color:var(--textDim);font-size:.72rem;cursor:pointer">Dosyalar</button>\` : ''}
-          <button onclick="adminDeleteTask('\${t.id}')" style="padding:5px 10px;border-radius:6px;background:transparent;border:1px solid var(--red)44;color:var(--red);font-size:.72rem;cursor:pointer">Sil</button>
-        </div>
-      </div>\`;
-    }).join('')}
-  `;
+  let html = '<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="adminDeleteAllDoneTasks()" style="padding:8px 14px;border-radius:8px;background:transparent;border:1px solid var(--red)66;color:var(--red);font-size:.8rem;cursor:pointer">🗑 Tüm Biten Görevleri Sil</button></div>';
+  allTasks.forEach(t => {
+    const assignedNames = (t.assigned_to||[]).map(uid => {
+      const p = allProfiles.find(x => x.id === uid);
+      return p ? p.name.split(' ')[0] : '?';
+    }).join(', ');
+    const statusColor = t.status === 'done' ? 'var(--green)' : t.status === 'doing' ? 'var(--orange)' : 'var(--textMuted)';
+    const statusLabel = t.status === 'done' ? 'Bitti' : t.status === 'doing' ? 'Devam' : 'Bekliyor';
+    const fileCount = (t.attachments || []).length;
+    html += '<div class="admin-row" style="align-items:start">';
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div style="font-size:.88rem;color:var(--text);margin-bottom:4px">' + esc(t.title) + '</div>';
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    html += '<span style="font-size:.72rem;color:' + statusColor + '">● ' + statusLabel + '</span>';
+    if (assignedNames) html += '<span style="font-size:.72rem;color:var(--textMuted)">👤 ' + esc(assignedNames) + '</span>';
+    if (fileCount) html += '<span style="font-size:.72rem;color:var(--textMuted)">📎 ' + fileCount + ' dosya</span>';
+    if (t.due_date) html += '<span style="font-size:.72rem;color:var(--textMuted)">📅 ' + formatDate(t.due_date) + '</span>';
+    html += '</div></div>';
+    html += '<div style="display:flex;gap:6px;flex-shrink:0;margin-top:2px">';
+    if (fileCount) html += '<button onclick="adminManageTaskFiles(\'' + t.id + '\')" style="padding:5px 10px;border-radius:6px;background:transparent;border:1px solid var(--border2);color:var(--textDim);font-size:.72rem;cursor:pointer">Dosyalar</button>';
+    html += '<button onclick="adminDeleteTask(\'' + t.id + '\')" style="padding:5px 10px;border-radius:6px;background:transparent;border:1px solid var(--red)44;color:var(--red);font-size:.72rem;cursor:pointer">Sil</button>';
+    html += '</div></div>';
+  });
+  el.innerHTML = html;
 }
-
 async function adminDeleteTask(id) {
   if (!confirm('Bu görevi tamamen silmek istiyor musunuz? Tüm dosyalar da silinecek.')) return;
   const task = allTasks.find(t => t.id === id);
@@ -1560,7 +1552,7 @@ async function adminDeleteTask(id) {
 async function adminDeleteAllDoneTasks() {
   const doneTasks = allTasks.filter(t => t.status === 'done');
   if (!doneTasks.length) { showToast('Bitmiş görev yok'); return; }
-  if (!confirm(\`\${doneTasks.length} adet bitmiş görevi silmek istiyor musunuz?\`)) return;
+  if (!confirm(doneTasks.length + ' adet bitmiş görevi silmek istiyor musunuz?')) return;
   // Delete all files
   const allPaths = doneTasks.flatMap(t => (t.attachments||[]).map(f => f.path).filter(Boolean));
   if (allPaths.length) await sb.storage.from('task-files').remove(allPaths);
