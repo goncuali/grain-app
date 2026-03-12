@@ -342,7 +342,7 @@ code,.mono{font-family:'JetBrains Mono',monospace}
     <div class="stats-grid" id="stats-grid">
       <div class="stat-card"><div class="stat-value" id="stat-projects">—</div><div class="stat-label">Proje</div></div>
       <div class="stat-card"><div class="stat-value" id="stat-tasks">—</div><div class="stat-label">Görev</div></div>
-      <div class="stat-card"><div class="stat-value" id="stat-academic">—</div><div class="stat-label">Akademik</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-academic">—</div><div class="stat-label">Yayınlar</div></div>
       <div class="stat-card"><div class="stat-value" id="stat-members">—</div><div class="stat-label">Üye</div></div>
     </div>
     <div id="announcements-home" style="margin-bottom:4px"></div>
@@ -1114,7 +1114,7 @@ document.addEventListener('click', e => {
 function renderHome() {
   document.getElementById('stat-projects').textContent = allProjects.length;
   document.getElementById('stat-tasks').textContent = allTasks.length;
-  document.getElementById('stat-academic').textContent = allAcademic.length;
+  document.getElementById('stat-academic').textContent = allPublications.length;
   document.getElementById('stat-members').textContent = allProfiles.length;
 
   // Upcoming deadlines
