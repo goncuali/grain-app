@@ -89,8 +89,8 @@ code,.mono{font-family:'JetBrains Mono',monospace}
 .page.active{display:block}
 
 /* ── BOTTOM NAV ── */
-.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
-.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 4px 8px;cursor:pointer;gap:4px;transition:color .2s;color:var(--textMuted);position:relative}
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom);overflow-x:auto;scrollbar-width:none}.bottom-nav::-webkit-scrollbar{display:none}
+.nav-item{flex:0 0 auto;min-width:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 8px 8px;cursor:pointer;gap:4px;transition:color .2s;color:var(--textMuted);position:relative}
 .nav-item.active{color:var(--gold)}
 .nav-item svg{width:20px;height:20px;stroke-width:1.8}
 .nav-item span{font-size:.6rem;letter-spacing:.05em;font-family:'JetBrains Mono',monospace;text-transform:uppercase}
