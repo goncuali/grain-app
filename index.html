@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="logo.png"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
- <!-- v8 -->
+
 <style>
 :root {
   --bg: #08090f;
@@ -499,6 +499,21 @@ code,.mono{font-family:'JetBrains Mono',monospace}
     <div id="admin-logs" style="display:none"></div>
   </div>
 
+
+  <!-- BRAINSTORM -->
+  <div class="page" id="page-brainstorm">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div class="section-title" style="margin:0">Beyin Fırtınası</div>
+    </div>
+    <div class="academic-types-scroll" style="margin-bottom:12px">
+      <button class="academic-type-btn active" onclick="filterBrainstorm('all',this)">Tümü</button>
+      <button class="academic-type-btn" onclick="filterBrainstorm('open',this)">Açık</button>
+      <button class="academic-type-btn" onclick="filterBrainstorm('solved',this)">Çözüldü</button>
+      <button class="academic-type-btn" onclick="filterBrainstorm('pinned',this)">Sabitlenmiş</button>
+    </div>
+    <div id="brainstorm-list"><div class="empty"><p>Yükleniyor...</p></div></div>
+  </div>
+
   <!-- BOTTOM NAV -->
 
   <!-- PUBLICATIONS -->
@@ -533,6 +548,10 @@ code,.mono{font-family:'JetBrains Mono',monospace}
     <div class="nav-item" onclick="showPage('publications')" data-page="publications">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
       <span>Yayınlar</span>
+    </div>
+    <div class="nav-item" onclick="showPage('brainstorm')" data-page="brainstorm">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+      <span>Fikirler</span>
     </div>
     <div class="nav-item" onclick="showPage('calendar')" data-page="calendar">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -734,6 +753,36 @@ code,.mono{font-family:'JetBrains Mono',monospace}
   </div>
 </div>
 
+
+<!-- MODAL: New Idea -->
+<div class="modal-overlay" id="modal-brainstorm">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Yeni Fikir / Öneri</div>
+    <div class="modal-form">
+      <div class="form-group"><label>Başlık *</label><input type="text" id="bs-title" placeholder="Fikir başlığı"/></div>
+      <div class="form-group"><label>Açıklama</label><textarea id="bs-body" placeholder="Detayları buraya yaz..." style="min-height:100px"></textarea></div>
+      <div class="form-group"><label>Kategori</label>
+        <select id="bs-category">
+          <option value="konu">Araştırma Konusu</option>
+          <option value="yontem">Yöntem Önerisi</option>
+          <option value="proje">Proje Fikri</option>
+          <option value="genel">Genel Görüş</option>
+          <option value="diger">Diğer</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal btn-cancel" onclick="closeModal('modal-brainstorm')">İptal</button>
+      <button class="btn-modal btn-confirm" onclick="saveBrainstorm()">Paylaş</button>
+    </div>
+  </div>
+</div>
+
+<!-- BRAINSTORM DETAIL OVERLAY -->
+<div id="brainstorm-detail-overlay" style="display:none;position:fixed;inset:0;z-index:300;background:var(--bg);flex-direction:column;max-width:430px;left:50%;transform:translateX(-50%);overflow-y:auto">
+</div>
+
 <!-- Supabase JS -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
@@ -801,7 +850,7 @@ async function loadApp() {
       await new Promise(r => setTimeout(r, 500));
       await loadProfile();
     }
-    await Promise.all([loadProfiles(), loadProjects(), loadTasks(), loadAcademic(), loadNotifications(), loadPublications()]);
+    await Promise.all([loadProfiles(), loadProjects(), loadTasks(), loadAcademic(), loadNotifications(), loadPublications(), loadBrainstorm()]);
     setupRealtime();
     renderApp();
     document.getElementById('loading').style.display = 'none';
@@ -820,6 +869,7 @@ async function loadApp() {
     renderCalendar();
     if (isAdmin) renderAdmin();
     renderPublications();
+    renderBrainstorm();
   } catch(e) {
     console.error('loadApp error:', e);
     showLogin();
@@ -952,7 +1002,7 @@ function showPage(page) {
   if (navEl) navEl.classList.add('active');
   currentPage = page;
   // Show/hide FAB
-  const fabPages = ['tasks','academic','projects','admin','publications'];
+  const fabPages = ['tasks','academic','projects','admin','publications','brainstorm'];
   document.getElementById('fab-btn').style.display = fabPages.includes(page) ? 'flex' : 'none';
   if (page === 'calendar') renderCalendar();
   if (page === 'notifications') renderNotifications();
@@ -1675,6 +1725,7 @@ function openFab() {
   else if (currentPage === 'academic') openModal('modal-academic');
   else if (currentPage === 'projects' || currentPage === 'admin') openProjectModal();
   else if (currentPage === 'publications') openPubModal();
+  else if (currentPage === 'brainstorm') openModal('modal-brainstorm');
 }
 
 function openTaskModal() {
@@ -2335,6 +2386,240 @@ function closePubDetail() {
   document.getElementById('bottom-nav').style.display = 'flex';
   currentPub = null;
 }
+
+
+// ══════════════════════════════════════════════
+// BRAINSTORM
+// ══════════════════════════════════════════════
+let allBrainstorm = [];
+let bsFilter = 'all';
+
+const BS_CAT_LABELS = {
+  konu: 'Araştırma Konusu', yontem: 'Yöntem Önerisi',
+  proje: 'Proje Fikri', genel: 'Genel Görüş', diger: 'Diğer'
+};
+const BS_CAT_COLORS = {
+  konu: 'badge-gold', yontem: 'badge-navy', proje: 'badge-purple',
+  genel: 'badge-green', diger: 'badge-muted'
+};
+
+async function loadBrainstorm() {
+  const { data } = await sb.from('brainstorm').select('*').order('pinned', { ascending: false }).order('created_at', { ascending: false });
+  allBrainstorm = data || [];
+}
+
+function renderBrainstorm() {
+  const el = document.getElementById('brainstorm-list');
+  let items = allBrainstorm;
+  if (bsFilter === 'open') items = items.filter(b => !b.solved);
+  else if (bsFilter === 'solved') items = items.filter(b => b.solved);
+  else if (bsFilter === 'pinned') items = items.filter(b => b.pinned);
+  if (!items.length) {
+    el.innerHTML = '<div class="empty"><p>Henüz fikir yok. İlk fikri sen paylaş! 💡</p></div>'; return;
+  }
+  el.innerHTML = items.map(b => {
+    const author = allProfiles.find(p => p.id === b.created_by);
+    const catClass = BS_CAT_COLORS[b.category] || 'badge-muted';
+    const catLabel = BS_CAT_LABELS[b.category] || b.category;
+    const hasVoted = (b.votes || []).includes(currentUser?.id);
+    const commentCount = (b.comments || []).length;
+    return '<div class="card" style="margin-bottom:10px;cursor:pointer' + (b.pinned ? ';border-color:var(--gold)44' : '') + '" onclick="openBrainstormDetail(\'' + b.id + '\')">' +
+      '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">' +
+        '<div style="flex:1;min-width:0">' +
+          (b.pinned ? '<span style="font-size:.7rem;color:var(--gold);margin-bottom:4px;display:block">📌 Sabitlenmiş</span>' : '') +
+          (b.solved ? '<span style="font-size:.7rem;color:var(--green);margin-bottom:4px;display:block">✅ Çözüldü</span>' : '') +
+          '<div style="font-size:.95rem;color:var(--text);font-weight:500">' + esc(b.title) + '</div>' +
+        '</div>' +
+        '<span class="badge ' + catClass + '" style="flex-shrink:0;margin-left:8px">' + catLabel + '</span>' +
+      '</div>' +
+      (b.body ? '<div style="font-size:.85rem;color:var(--textMuted);margin-bottom:10px;line-height:1.5">' + esc(b.body).substring(0, 120) + (b.body.length > 120 ? '...' : '') + '</div>' : '') +
+      '<div style="display:flex;align-items:center;justify-content:space-between">' +
+        '<div style="display:flex;gap:12px">' +
+          '<span style="font-size:.78rem;color:' + (hasVoted ? 'var(--gold)' : 'var(--textMuted)') + ';display:flex;align-items:center;gap:4px">👍 ' + (b.votes || []).length + '</span>' +
+          '<span style="font-size:.78rem;color:var(--textMuted);display:flex;align-items:center;gap:4px">💬 ' + commentCount + '</span>' +
+        '</div>' +
+        '<span style="font-size:.72rem;color:var(--textMuted)">' + (author ? esc(author.name.split(' ')[0]) : '?') + ' · ' + timeAgo(b.created_at) + '</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function filterBrainstorm(f, el) {
+  bsFilter = f;
+  document.querySelectorAll('#page-brainstorm .academic-type-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderBrainstorm();
+}
+
+async function saveBrainstorm() {
+  const title = document.getElementById('bs-title').value.trim();
+  if (!title) { showToast('Başlık gerekli!'); return; }
+  const item = {
+    title,
+    body: document.getElementById('bs-body').value.trim() || null,
+    category: document.getElementById('bs-category').value,
+    created_by: currentUser.id,
+    votes: [],
+    comments: [],
+    pinned: false,
+    solved: false
+  };
+  const { data, error } = await sb.from('brainstorm').insert([item]).select().single();
+  if (error) { showToast('Hata: ' + error.message); return; }
+  allBrainstorm.unshift(data);
+  renderBrainstorm();
+  closeModal('modal-brainstorm');
+  document.getElementById('bs-title').value = '';
+  document.getElementById('bs-body').value = '';
+  showToast('💡 Fikir paylaşıldı!');
+}
+
+function openBrainstormDetail(id) {
+  const item = allBrainstorm.find(b => b.id === id);
+  if (!item) return;
+  renderBrainstormDetail(item);
+  const overlay = document.getElementById('brainstorm-detail-overlay');
+  overlay.style.display = 'flex';
+  document.getElementById('bottom-nav').style.display = 'none';
+  document.getElementById('fab-btn').style.display = 'none';
+}
+
+function closeBrainstormDetail() {
+  document.getElementById('brainstorm-detail-overlay').style.display = 'none';
+  document.getElementById('bottom-nav').style.display = 'flex';
+  renderBrainstorm();
+}
+
+function renderBrainstormDetail(b) {
+  const overlay = document.getElementById('brainstorm-detail-overlay');
+  const author = allProfiles.find(p => p.id === b.created_by);
+  const catClass = BS_CAT_COLORS[b.category] || 'badge-muted';
+  const catLabel = BS_CAT_LABELS[b.category] || b.category;
+  const hasVoted = (b.votes || []).includes(currentUser?.id);
+  const isAdmin = currentProfile?.role === 'admin';
+  const isOwner = b.created_by === currentUser?.id;
+
+  let commentsHtml = '';
+  if (!(b.comments || []).length) {
+    commentsHtml = '<div style="color:var(--textMuted);font-size:.85rem;padding:8px 0">Henüz yorum yok. İlk yorumu yap!</div>';
+  } else {
+    commentsHtml = (b.comments || []).map((c, i) => {
+      const cp = allProfiles.find(p => p.id === c.user_id);
+      const isMe = c.user_id === currentUser?.id;
+      return '<div class="card" style="margin-bottom:8px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+          '<span style="font-size:.78rem;color:var(--wheat)">' + (cp ? esc(cp.name.split(' ')[0]) : '?') + '</span>' +
+          '<div style="display:flex;align-items:center;gap:8px">' +
+            '<span style="font-size:.7rem;color:var(--textMuted)">' + timeAgo(c.created_at) + '</span>' +
+            ((isAdmin || isMe) ? '<button onclick="deleteBsComment(\'' + b.id + '\',' + i + ')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.75rem">✕</button>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div style="font-size:.88rem;color:var(--text);line-height:1.5">' + esc(c.text) + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  overlay.innerHTML =
+    '<div style="position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px;z-index:10">' +
+      '<div onclick="closeBrainstormDetail()" style="cursor:pointer;color:var(--gold)">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="22" height="22"><polyline points="15,18 9,12 15,6"/></svg>' +
+      '</div>' +
+      '<div style="flex:1;font-family:\'Cinzel\',serif;font-size:.9rem;color:var(--wheat);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(b.title) + '</div>' +
+      (isAdmin || isOwner ? '<button onclick="deleteBrainstorm(\'' + b.id + '\')" style="background:none;border:1px solid var(--red)44;border-radius:6px;color:var(--red);cursor:pointer;padding:4px 10px;font-size:.75rem">Sil</button>' : '') +
+    '</div>' +
+    '<div style="padding:16px 16px 80px">' +
+      '<div class="card" style="margin-bottom:16px' + (b.pinned ? ';border-color:var(--gold)44' : '') + '">' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
+          '<span class="badge ' + catClass + '">' + catLabel + '</span>' +
+          (b.pinned ? '<span class="badge badge-gold">📌 Sabitlenmiş</span>' : '') +
+          (b.solved ? '<span class="badge badge-green">✅ Çözüldü</span>' : '') +
+        '</div>' +
+        (b.body ? '<div style="font-size:.92rem;color:var(--text);line-height:1.6;margin-bottom:12px">' + esc(b.body) + '</div>' : '') +
+        '<div style="font-size:.75rem;color:var(--textMuted)">' + (author ? esc(author.name) : '?') + ' · ' + timeAgo(b.created_at) + '</div>' +
+      '</div>' +
+
+      '<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">' +
+        '<button onclick="toggleBsVote(\'' + b.id + '\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;border:1px solid ' + (hasVoted ? 'var(--gold)' : 'var(--border2)') + ';background:' + (hasVoted ? '#c8920a22' : 'transparent') + ';color:' + (hasVoted ? 'var(--wheat)' : 'var(--textDim)') + ';cursor:pointer;font-size:.85rem;transition:all .2s">' +
+          '👍 ' + (hasVoted ? 'Beğenildi' : 'Beğen') + ' · ' + (b.votes || []).length +
+        '</button>' +
+        (isAdmin ? '<button onclick="toggleBsPin(\'' + b.id + '\')" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--textDim);cursor:pointer;font-size:.85rem">' + (b.pinned ? '📌 Sabiti Kaldır' : '📌 Sabitle') + '</button>' : '') +
+        (isAdmin ? '<button onclick="toggleBsSolved(\'' + b.id + '\')" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--textDim);cursor:pointer;font-size:.85rem">' + (b.solved ? '🔄 Yeniden Aç' : '✅ Çözüldü') + '</button>' : '') +
+      '</div>' +
+
+      '<div class="section-title">Yorumlar (' + (b.comments || []).length + ')</div>' +
+      '<div id="bs-comments-list">' + commentsHtml + '</div>' +
+      '<div style="display:flex;gap:8px;margin-top:12px">' +
+        '<textarea id="bs-comment-input" style="flex:1;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:10px;color:var(--text);font-family:\'Crimson Pro\',serif;font-size:.9rem;resize:none;outline:none;min-height:60px;transition:border-color .2s" placeholder="Yorum yaz..." onfocus="this.style.borderColor=\'var(--gold)\'" onblur="this.style.borderColor=\'var(--border2)\'"></textarea>' +
+        '<button onclick="addBsComment(\'' + b.id + '\')" style="background:linear-gradient(135deg,var(--gold),var(--wheat));border:none;border-radius:8px;padding:10px 14px;cursor:pointer;color:#08090f;font-weight:700;align-self:flex-end;font-size:1.1rem">+</button>' +
+      '</div>' +
+    '</div>';
+}
+
+async function toggleBsVote(id) {
+  const item = allBrainstorm.find(b => b.id === id);
+  if (!item) return;
+  const votes = [...(item.votes || [])];
+  const idx = votes.indexOf(currentUser.id);
+  if (idx >= 0) votes.splice(idx, 1);
+  else votes.push(currentUser.id);
+  await sb.from('brainstorm').update({ votes }).eq('id', id);
+  item.votes = votes;
+  renderBrainstormDetail(item);
+}
+
+async function toggleBsPin(id) {
+  const item = allBrainstorm.find(b => b.id === id);
+  if (!item) return;
+  const pinned = !item.pinned;
+  await sb.from('brainstorm').update({ pinned }).eq('id', id);
+  item.pinned = pinned;
+  renderBrainstormDetail(item);
+  showToast(pinned ? '📌 Sabitlendi' : 'Sabit kaldırıldı');
+}
+
+async function toggleBsSolved(id) {
+  const item = allBrainstorm.find(b => b.id === id);
+  if (!item) return;
+  const solved = !item.solved;
+  await sb.from('brainstorm').update({ solved }).eq('id', id);
+  item.solved = solved;
+  renderBrainstormDetail(item);
+  showToast(solved ? '✅ Çözüldü olarak işaretlendi' : 'Yeniden açıldı');
+}
+
+async function addBsComment(id) {
+  const input = document.getElementById('bs-comment-input');
+  const text = input.value.trim();
+  if (!text) return;
+  const item = allBrainstorm.find(b => b.id === id);
+  if (!item) return;
+  const comments = [...(item.comments || [])];
+  comments.push({ user_id: currentUser.id, text, created_at: new Date().toISOString() });
+  await sb.from('brainstorm').update({ comments }).eq('id', id);
+  item.comments = comments;
+  input.value = '';
+  renderBrainstormDetail(item);
+}
+
+async function deleteBsComment(id, index) {
+  const item = allBrainstorm.find(b => b.id === id);
+  if (!item) return;
+  const comments = [...(item.comments || [])];
+  comments.splice(index, 1);
+  await sb.from('brainstorm').update({ comments }).eq('id', id);
+  item.comments = comments;
+  renderBrainstormDetail(item);
+  showToast('Yorum silindi');
+}
+
+async function deleteBrainstorm(id) {
+  if (!confirm('Bu fikri silmek istiyor musunuz?')) return;
+  await sb.from('brainstorm').delete().eq('id', id);
+  allBrainstorm = allBrainstorm.filter(b => b.id !== id);
+  closeBrainstormDetail();
+  showToast('Fikir silindi');
+}
+
 
 // HELPERS
 // ══════════════════════════════════════════════
