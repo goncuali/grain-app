@@ -1106,7 +1106,7 @@ function renderMembers() {
   el.innerHTML = allProfiles.map((p, i) => {
     const initials = p.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
     const color = MEMBER_COLORS[i % MEMBER_COLORS.length];
-    return `<div class="member-card" onclick="openDM('${p.id}')">
+    return `<div class="member-card" onclick="openDMFrom('${p.id}','members')">
       <div class="member-avatar" style="background:${color}">${initials}</div>
       <div class="member-info">
         <div class="member-name">${esc(p.name)}</div>
@@ -1151,7 +1151,7 @@ function renderDMList() {
   el.innerHTML = others.map((p, i) => {
     const color = MEMBER_COLORS[allProfiles.findIndex(x=>x.id===p.id) % MEMBER_COLORS.length];
     const initials = p.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
-    return `<div class="msg-item" onclick="openDM('${p.id}')">
+    return `<div class="msg-item" onclick="openDMFrom('${p.id}','messages')">
       <div class="msg-avatar" style="background:${color}">${initials}</div>
       <div class="msg-info">
         <div class="msg-name">${esc(p.name)}</div>
@@ -1170,8 +1170,13 @@ function switchMsgTab(tab, el) {
 }
 
 function openDM(userId) {
+  openDMFrom(userId, currentPage || 'messages');
+}
+
+function openDMFrom(userId, returnPage) {
   const p = allProfiles.find(x => x.id === userId);
   if (!p) return;
+  chatReturnPage = returnPage;
   const color = MEMBER_COLORS[allProfiles.findIndex(x=>x.id===userId) % MEMBER_COLORS.length];
   const initials = p.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
   openChat('dm', userId, p.name, color, initials, p.email);
@@ -1265,11 +1270,18 @@ function chatKeydown(e) {
 function backToMessages() {
   const returnTo = chatReturnPage || 'messages';
   currentChatId = null; currentChatType = null; currentChatMessages = [];
-  showPage(returnTo);
-  // Re-render the return page
-  if (returnTo === 'members') renderMembers();
-  else if (returnTo === 'messages') { renderMessages(); }
+  // Manually show the return page without triggering showPage side effects
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const el = document.getElementById('page-' + returnTo);
+  if (el) el.classList.add('active');
+  const navEl = document.querySelector(`[data-page="${returnTo}"]`);
+  if (navEl) navEl.classList.add('active');
+  currentPage = returnTo;
   document.getElementById('fab-btn').style.display = 'none';
+  // Re-render content
+  if (returnTo === 'members') renderMembers();
+  else if (returnTo === 'messages') renderMessages();
 }
 
 // ══════════════════════════════════════════════
