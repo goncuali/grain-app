@@ -488,12 +488,14 @@ code,.mono{font-family:'JetBrains Mono',monospace}
   <div class="page" id="page-admin">
     <div class="section-title" style="margin-top:4px">Yönetim Paneli</div>
     <div class="tabs">
-      <div class="tab active" onclick="switchAdminTab('users',this)">Kullanıcılar</div>
+      <div class="tab active" onclick="switchAdminTab('users',this)">Üyeler</div>
       <div class="tab" onclick="switchAdminTab('projects',this)">Projeler</div>
+      <div class="tab" onclick="switchAdminTab('tasks-admin',this)">Görevler</div>
       <div class="tab" onclick="switchAdminTab('logs',this)">Loglar</div>
     </div>
     <div id="admin-users"></div>
     <div id="admin-projects" style="display:none"></div>
+    <div id="admin-tasks-admin" style="display:none"></div>
     <div id="admin-logs" style="display:none"></div>
   </div>
 
@@ -1497,8 +1499,154 @@ function switchAdminTab(tab, el) {
   el.classList.add('active');
   document.getElementById('admin-users').style.display = tab === 'users' ? 'block' : 'none';
   document.getElementById('admin-projects').style.display = tab === 'projects' ? 'block' : 'none';
+  document.getElementById('admin-tasks-admin').style.display = tab === 'tasks-admin' ? 'block' : 'none';
   document.getElementById('admin-logs').style.display = tab === 'logs' ? 'block' : 'none';
   if (tab === 'logs') loadLogs();
+  if (tab === 'tasks-admin') renderAdminTasks();
+}
+
+function renderAdminTasks() {
+  const el = document.getElementById('admin-tasks-admin');
+  if (!allTasks.length) {
+    el.innerHTML = '<div class="empty"><p>Görev yok</p></div>'; return;
+  }
+  el.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button onclick="adminDeleteAllDoneTasks()" style="padding:8px 14px;border-radius:8px;background:transparent;border:1px solid var(--red)66;color:var(--red);font-size:.8rem;cursor:pointer">
+        🗑 Tüm Biten Görevleri Sil
+      </button>
+    </div>
+    ${allTasks.map(t => {
+      const assignedNames = (t.assigned_to||[]).map(uid => {
+        const p = allProfiles.find(x => x.id === uid);
+        return p ? p.name.split(' ')[0] : '?';
+      }).join(', ');
+      const statusColor = t.status === 'done' ? 'var(--green)' : t.status === 'doing' ? 'var(--orange)' : 'var(--textMuted)';
+      const statusLabel = t.status === 'done' ? 'Bitti' : t.status === 'doing' ? 'Devam' : 'Bekliyor';
+      const fileCount = (t.attachments || []).length;
+      return \`<div class="admin-row" style="align-items:start">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.88rem;color:var(--text);margin-bottom:4px">\${esc(t.title)}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <span style="font-size:.72rem;color:\${statusColor}">● \${statusLabel}</span>
+            \${assignedNames ? \`<span style="font-size:.72rem;color:var(--textMuted)">👤 \${esc(assignedNames)}</span>\` : ''}
+            \${fileCount ? \`<span style="font-size:.72rem;color:var(--textMuted);cursor:pointer" onclick="adminManageTaskFiles('\${t.id}')">📎 \${fileCount} dosya</span>\` : ''}
+            \${t.due_date ? \`<span style="font-size:.72rem;color:var(--textMuted)">📅 \${formatDate(t.due_date)}</span>\` : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;margin-top:2px">
+          \${fileCount ? \`<button onclick="adminManageTaskFiles('\${t.id}')" style="padding:5px 10px;border-radius:6px;background:transparent;border:1px solid var(--border2);color:var(--textDim);font-size:.72rem;cursor:pointer">Dosyalar</button>\` : ''}
+          <button onclick="adminDeleteTask('\${t.id}')" style="padding:5px 10px;border-radius:6px;background:transparent;border:1px solid var(--red)44;color:var(--red);font-size:.72rem;cursor:pointer">Sil</button>
+        </div>
+      </div>\`;
+    }).join('')}
+  `;
+}
+
+async function adminDeleteTask(id) {
+  if (!confirm('Bu görevi tamamen silmek istiyor musunuz? Tüm dosyalar da silinecek.')) return;
+  const task = allTasks.find(t => t.id === id);
+  // Delete storage files
+  if (task?.attachments?.length) {
+    const paths = task.attachments.map(f => f.path).filter(Boolean);
+    if (paths.length) await sb.storage.from('task-files').remove(paths);
+  }
+  await sb.from('tasks').delete().eq('id', id);
+  allTasks = allTasks.filter(t => t.id !== id);
+  renderAdminTasks();
+  showToast('Görev silindi');
+}
+
+async function adminDeleteAllDoneTasks() {
+  const doneTasks = allTasks.filter(t => t.status === 'done');
+  if (!doneTasks.length) { showToast('Bitmiş görev yok'); return; }
+  if (!confirm(\`\${doneTasks.length} adet bitmiş görevi silmek istiyor musunuz?\`)) return;
+  // Delete all files
+  const allPaths = doneTasks.flatMap(t => (t.attachments||[]).map(f => f.path).filter(Boolean));
+  if (allPaths.length) await sb.storage.from('task-files').remove(allPaths);
+  const ids = doneTasks.map(t => t.id);
+  await sb.from('tasks').delete().in('id', ids);
+  allTasks = allTasks.filter(t => t.status !== 'done');
+  renderAdminTasks();
+  renderTasks && renderTasks();
+  showToast(\`\${doneTasks.length} görev silindi\`);
+}
+
+function adminManageTaskFiles(taskId) {
+  const task = allTasks.find(t => t.id === taskId);
+  if (!task || !task.attachments?.length) { showToast('Bu görevde dosya yok'); return; }
+
+  let overlay = document.getElementById('admin-files-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'admin-files-overlay';
+    overlay.style.cssText = 'display:none;position:fixed;inset:0;z-index:400;background:var(--bg);flex-direction:column;max-width:430px;left:50%;transform:translateX(-50%);overflow-y:auto';
+    document.body.appendChild(overlay);
+  }
+
+  const renderFiles = () => {
+    const t = allTasks.find(x => x.id === taskId);
+    const files = t?.attachments || [];
+    return files.map((f, i) => {
+      const isImage = f.type && f.type.startsWith('image/');
+      const sizeMB = f.size ? (f.size/1024/1024).toFixed(1)+' MB' : '';
+      return `<div class="card" style="margin-bottom:8px;display:flex;align-items:center;gap:12px">
+        ${isImage ? `<img src="${f.url}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0"/>` : `<div style="width:40px;height:40px;border-radius:8px;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0">📄</div>`}
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</div>
+          ${sizeMB ? `<div style="font-size:.72rem;color:var(--textMuted)">${sizeMB}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:6px">
+          <a href="${f.url}" target="_blank" style="width:32px;height:32px;border-radius:6px;background:var(--navyLight);color:white;text-decoration:none;display:flex;align-items:center;justify-content:center;font-size:.85rem">↓</a>
+          <button onclick="adminDeleteTaskFile('${taskId}',${i})" style="width:32px;height:32px;border-radius:6px;background:transparent;border:1px solid var(--red)44;color:var(--red);cursor:pointer;font-size:.8rem">✕</button>
+        </div>
+      </div>`;
+    }).join('') || '<div class="empty"><p>Dosya yok</p></div>';
+  };
+
+  overlay.innerHTML = `
+    <div style="position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px">
+      <div onclick="document.getElementById('admin-files-overlay').style.display='none'" style="cursor:pointer;color:var(--gold)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="22" height="22"><polyline points="15,18 9,12 15,6"/></svg>
+      </div>
+      <div style="flex:1;font-family:'Cinzel',serif;font-size:.9rem;color:var(--wheat)">Dosya Yönetimi</div>
+    </div>
+    <div style="padding:16px">
+      <div style="font-size:.8rem;color:var(--textMuted);margin-bottom:12px">${esc(task.title)}</div>
+      <div id="admin-files-inner">${renderFiles()}</div>
+      <button onclick="adminDeleteAllTaskFiles('${taskId}')" style="width:100%;margin-top:12px;padding:10px;background:transparent;border:1px solid var(--red)66;border-radius:8px;color:var(--red);font-size:.85rem;cursor:pointer">
+        🗑 Tüm Dosyaları Sil
+      </button>
+    </div>
+  `;
+  overlay.style.display = 'flex';
+}
+
+async function adminDeleteTaskFile(taskId, index) {
+  const task = allTasks.find(t => t.id === taskId);
+  if (!task) return;
+  const attachments = [...(task.attachments||[])];
+  const file = attachments[index];
+  if (!file) return;
+  if (file.path) await sb.storage.from('task-files').remove([file.path]);
+  attachments.splice(index, 1);
+  await sb.from('tasks').update({ attachments }).eq('id', taskId);
+  task.attachments = attachments;
+  // Re-render
+  adminManageTaskFiles(taskId);
+  showToast('Dosya silindi');
+}
+
+async function adminDeleteAllTaskFiles(taskId) {
+  const task = allTasks.find(t => t.id === taskId);
+  if (!task?.attachments?.length) return;
+  if (!confirm('Tüm dosyaları silmek istiyor musunuz?')) return;
+  const paths = task.attachments.map(f => f.path).filter(Boolean);
+  if (paths.length) await sb.storage.from('task-files').remove(paths);
+  await sb.from('tasks').update({ attachments: [] }).eq('id', taskId);
+  task.attachments = [];
+  document.getElementById('admin-files-inner').innerHTML = '<div class="empty"><p>Dosya yok</p></div>';
+  showToast('Tüm dosyalar silindi');
 }
 
 async function loadLogs() {
