@@ -465,6 +465,9 @@ code,.mono{font-family:'JetBrains Mono',monospace}
     <div id="members-list"><div class="empty"><p>Yükleniyor...</p></div></div>
   </div>
 
+  <!-- MEMBER PROFILE OVERLAY -->
+  <div id="member-profile-overlay" style="display:none;position:fixed;inset:0;z-index:300;background:var(--bg);flex-direction:column;max-width:430px;left:50%;transform:translateX(-50%);overflow-y:auto"></div>
+
   <!-- CALENDAR -->
   <div class="page" id="page-calendar">
     <div class="section-title" style="margin-top:4px" id="cal-title">Takvim</div>
@@ -1283,17 +1286,38 @@ async function toggleAcademic(id, currentStatus) {
 function renderMembers() {
   const el = document.getElementById('members-list');
   if (!allProfiles.length) { el.innerHTML = '<div class="empty"><p>Üye yok</p></div>'; return; }
+  const isAdmin = currentProfile?.role === 'admin';
   el.innerHTML = allProfiles.map((p, i) => {
     const initials = p.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
     const color = MEMBER_COLORS[i % MEMBER_COLORS.length];
-    return `<div class="member-card" onclick="openDMFrom('${p.id}','members')">
-      <div class="member-avatar" style="background:${color}">${initials}</div>
-      <div class="member-info">
-        <div class="member-name">${esc(p.name)}</div>
-        <div class="member-role">${ROLE_LABELS[p.role]||p.role} · ${esc(p.email)}</div>
-      </div>
-      ${p.id === currentUser.id ? '<span class="badge badge-gold">Ben</span>' : '<span style="color:var(--textMuted);font-size:1rem">›</span>'}
-    </div>`;
+    const isMe = p.id === currentUser.id;
+    const canViewProfile = isAdmin || isMe;
+    // Quick stats
+    const tasksDone = allTasks.filter(t => (t.assigned_to||[]).includes(p.id) && t.status === 'done').length;
+    const tasksTotal = allTasks.filter(t => (t.assigned_to||[]).includes(p.id)).length;
+    const pubs = allPublications.filter(pub => (pub.assigned_to||[]).includes(p.id)).length;
+    return '<div class="card" style="margin-bottom:8px">' +
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:' + (canViewProfile ? '10' : '0') + 'px">' +
+        '<div class="member-avatar" style="background:' + color + '">' + initials + '</div>' +
+        '<div style="flex:1">' +
+          '<div class="member-name">' + esc(p.name) + '</div>' +
+          '<div class="member-role">' + (ROLE_LABELS[p.role]||p.role) + '</div>' +
+        '</div>' +
+        (isMe ? '<span class="badge badge-gold">Ben</span>' : '') +
+      '</div>' +
+      (canViewProfile ?
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">' +
+          '<span class="badge badge-muted">✓ ' + tasksDone + '/' + tasksTotal + ' Görev</span>' +
+          '<span class="badge badge-muted">📄 ' + pubs + ' Yayın</span>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px">' +
+          '<button onclick="openMemberProfile('' + p.id + '')" style="flex:1;padding:8px;border-radius:8px;background:linear-gradient(135deg,var(--gold),var(--wheat));border:none;color:#08090f;font-weight:700;font-size:.8rem;cursor:pointer">Gelişim Profili</button>' +
+          '<button onclick="openDMFrom('' + p.id + '','members')" style="padding:8px 14px;border-radius:8px;background:transparent;border:1px solid var(--border2);color:var(--textDim);font-size:.8rem;cursor:pointer">💬</button>' +
+        '</div>'
+      :
+        '<button onclick="openDMFrom('' + p.id + '','members')" style="width:100%;padding:8px;border-radius:8px;background:transparent;border:1px solid var(--border2);color:var(--textDim);font-size:.8rem;cursor:pointer">💬 Mesaj Gönder</button>'
+      ) +
+    '</div>';
   }).join('');
 }
 
@@ -3078,6 +3102,189 @@ async function deleteAnnouncement(id) {
   renderAnnouncementsHome();
   renderAnnouncementsInNotifications();
   showToast('Duyuru silindi');
+}
+
+
+// ══════════════════════════════════════════════
+// MEMBER PROFILE & DEVELOPMENT TRACKING
+// ══════════════════════════════════════════════
+
+function openMemberProfile(userId) {
+  const profile = allProfiles.find(p => p.id === userId);
+  if (!profile) return;
+  const isAdmin = currentProfile?.role === 'admin';
+  const isMe = userId === currentUser.id;
+  if (!isAdmin && !isMe) { showToast('Bu profili görme yetkiniz yok'); return; }
+  renderMemberProfile(profile);
+  document.getElementById('member-profile-overlay').style.display = 'flex';
+  document.getElementById('bottom-nav').style.display = 'none';
+  document.getElementById('fab-btn').style.display = 'none';
+}
+
+function closeMemberProfile() {
+  document.getElementById('member-profile-overlay').style.display = 'none';
+  document.getElementById('bottom-nav').style.display = 'flex';
+}
+
+function renderMemberProfile(p) {
+  const overlay = document.getElementById('member-profile-overlay');
+  const isAdmin = currentProfile?.role === 'admin';
+  const isMe = p.id === currentUser.id;
+  const color = MEMBER_COLORS[allProfiles.findIndex(x => x.id === p.id) % MEMBER_COLORS.length];
+  const initials = p.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+
+  // ── Task stats
+  const myTasks = allTasks.filter(t => (t.assigned_to || []).includes(p.id));
+  const tasksDone = myTasks.filter(t => t.status === 'done').length;
+  const tasksDoing = myTasks.filter(t => t.status === 'doing').length;
+  const tasksTodo = myTasks.filter(t => t.status === 'todo').length;
+
+  // ── Publications
+  const myPubs = allPublications.filter(pub => (pub.assigned_to || []).includes(p.id));
+  const pubMakale = myPubs.filter(pub => pub.type === 'makale');
+  const pubBildiri = myPubs.filter(pub => pub.type === 'bildiri');
+
+  // ── Academic tasks
+  const myAcademic = allAcademic.filter(t => (t.assigned_to || []).includes(p.id));
+  const seminars = myAcademic.filter(t => t.type === 'seminer');
+  const reports = myAcademic.filter(t => t.type === 'rapor');
+  const monthly = myAcademic.filter(t => t.type === 'aylik');
+
+  // ── Analysis types learned (from analysis_data)
+  // We'll use a stored field on the profile or show from tasks they contributed to
+
+  // ── Meeting attendance
+  const myMeetings = allMeetings.filter(m => (m.rsvp || {})[p.id] === 'yes');
+
+  // ── Custom development fields from profile
+  const dev = p.development || {};
+
+  const statBox = (val, label, color) =>
+    '<div style="flex:1;background:var(--card);border-radius:8px;padding:10px;text-align:center">' +
+      '<div style="font-size:1.4rem;font-weight:700;color:' + color + '">' + val + '</div>' +
+      '<div style="font-size:.7rem;color:var(--textMuted);margin-top:2px">' + label + '</div>' +
+    '</div>';
+
+  const sectionCard = (title, items, emptyMsg) =>
+    '<div class="section-title" style="margin-top:16px">' + title + '</div>' +
+    '<div class="card">' +
+    (items.length ? items.map(item =>
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">' +
+        '<span style="font-size:.85rem;color:var(--text)">' + esc(item.title || item.name || '') + '</span>' +
+        '<span class="badge badge-muted">' + (item.badge || '') + '</span>' +
+      '</div>'
+    ).join('') :
+      '<div style="color:var(--textMuted);font-size:.85rem;padding:4px 0">' + emptyMsg + '</div>'
+    ) +
+    '</div>';
+
+  // Editable custom fields (thesis, books, congresses)
+  const editableSection = (label, fieldKey, placeholder, isTextarea) => {
+    const val = dev[fieldKey] || '';
+    const inputId = 'dev-' + fieldKey + '-' + p.id;
+    if (isTextarea) {
+      return '<div class="section-title" style="margin-top:16px">' + label + '</div>' +
+        '<textarea id="' + inputId + '" style="width:100%;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:10px;color:var(--text);font-family:\'Crimson Pro\',serif;font-size:.9rem;resize:none;outline:none;min-height:70px;box-sizing:border-box;transition:border-color .2s" placeholder="' + placeholder + '" onfocus="this.style.borderColor=\'var(--gold)\'" onblur="this.style.borderColor=\'var(--border2)\'">' + esc(val) + '</textarea>';
+    }
+    return '<div class="section-title" style="margin-top:16px">' + label + '</div>' +
+      '<input type="text" id="' + inputId + '" value="' + esc(val) + '" placeholder="' + placeholder + '" style="width:100%;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:10px;color:var(--text);font-size:.9rem;outline:none;box-sizing:border-box;transition:border-color .2s" onfocus="this.style.borderColor=\'var(--gold)\'" onblur="this.style.borderColor=\'var(--border2)\'"/>';
+  };
+
+  const canEdit = isAdmin || isMe;
+
+  overlay.innerHTML =
+    // Header
+    '<div style="position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px;z-index:10">' +
+      '<div onclick="closeMemberProfile()" style="cursor:pointer;color:var(--gold)">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="22" height="22"><polyline points="15,18 9,12 15,6"/></svg>' +
+      '</div>' +
+      '<div style="flex:1;font-family:\'Cinzel\',serif;font-size:.9rem;color:var(--wheat)">Gelişim Profili</div>' +
+    '</div>' +
+
+    '<div style="padding:16px 16px 100px">' +
+
+    // Avatar + name
+    '<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">' +
+      '<div class="member-avatar" style="background:' + color + ';width:60px;height:60px;font-size:1.2rem;flex-shrink:0">' + initials + '</div>' +
+      '<div>' +
+        '<div style="font-family:\'Cinzel\',serif;font-size:1.1rem;color:var(--wheat)">' + esc(p.name) + '</div>' +
+        '<div style="font-size:.8rem;color:var(--textMuted);margin-top:4px">' + (ROLE_LABELS[p.role] || p.role) + '</div>' +
+        '<div style="font-size:.75rem;color:var(--textMuted)">' + esc(p.email) + '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // Quick stats row
+    '<div style="display:flex;gap:8px;margin-bottom:4px">' +
+      statBox(tasksDone, 'Görev Bitti', 'var(--green)') +
+      statBox(myPubs.length, 'Yayın', 'var(--gold)') +
+      statBox(myMeetings.length, 'Toplantı', 'var(--navyBright)') +
+      statBox(seminars.length, 'Seminer', 'var(--purple)') +
+    '</div>' +
+
+    // Tasks detail
+    '<div class="section-title" style="margin-top:16px">Proje Görevleri</div>' +
+    '<div class="card" style="margin-bottom:4px">' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+        '<span class="badge badge-green">✓ Bitti: ' + tasksDone + '</span>' +
+        '<span class="badge badge-orange">⟳ Devam: ' + tasksDoing + '</span>' +
+        '<span class="badge badge-muted">◯ Bekliyor: ' + tasksTodo + '</span>' +
+      '</div>' +
+      (myTasks.length ? '<div style="margin-top:10px">' + myTasks.slice(0, 5).map(t =>
+        '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:.82rem">' +
+          '<span style="color:' + (t.status === 'done' ? 'var(--textMuted)' : 'var(--text)') + ';text-decoration:' + (t.status === 'done' ? 'line-through' : 'none') + '">' + esc(t.title) + '</span>' +
+          '<span style="color:' + (t.status === 'done' ? 'var(--green)' : t.status === 'doing' ? 'var(--orange)' : 'var(--textMuted)') + ';font-size:.72rem">' + (t.status === 'done' ? 'Bitti' : t.status === 'doing' ? 'Devam' : 'Bekliyor') + '</span>' +
+        '</div>'
+      ).join('') + (myTasks.length > 5 ? '<div style="font-size:.75rem;color:var(--textMuted);padding-top:4px">+' + (myTasks.length - 5) + ' görev daha</div>' : '') + '</div>' : '') +
+    '</div>' +
+
+    // Publications
+    sectionCard('Yayınlar',
+      [...pubMakale.map(p => ({ title: p.title, badge: 'Makale · ' + (p.stage === 'yayinlandi' ? '✓' : p.stage) })),
+       ...pubBildiri.map(p => ({ title: p.title, badge: 'Bildiri · ' + (p.stage === 'yayinlandi' ? '✓' : p.stage) }))],
+      'Yayın yok') +
+
+    // Seminars
+    sectionCard('Seminerler', seminars.map(s => ({ title: s.title, badge: s.due_date ? formatDate(s.due_date) : '' })), 'Seminer yok') +
+
+    // Meetings
+    '<div class="section-title" style="margin-top:16px">Toplantı Katılımı</div>' +
+    '<div class="card" style="margin-bottom:4px">' +
+      (myMeetings.length ?
+        myMeetings.slice(0, 5).map(m =>
+          '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:.82rem">' +
+            '<span style="color:var(--text)">' + esc(m.title) + '</span>' +
+            '<span style="color:var(--textMuted);font-size:.72rem">' + formatDate(m.date) + '</span>' +
+          '</div>'
+        ).join('') + (myMeetings.length > 5 ? '<div style="font-size:.75rem;color:var(--textMuted);padding-top:4px">+' + (myMeetings.length - 5) + ' toplantı daha</div>' : '')
+      : '<div style="color:var(--textMuted);font-size:.85rem;padding:4px 0">Toplantı katılımı yok</div>') +
+    '</div>' +
+
+    // Editable fields
+    (canEdit ?
+      editableSection('Tez Önerisi', 'thesis_proposal', 'Tez önerisi başlığı / durumu...') +
+      editableSection('Tez', 'thesis', 'Tez başlığı / durumu...') +
+      editableSection('Katıldığı Kongreler', 'congresses', 'Kongre adları, yıllar...', true) +
+      editableSection('Yazılan / Yazılan Kitaplar', 'books', 'Kitap adları...', true) +
+      editableSection('Öğrenilen Analizler', 'analyses_learned', 'HPLC, GC-MS, fenolik, antioksidan...', true) +
+      editableSection('Notlar', 'notes', 'Ek notlar...', true) +
+      '<button onclick="saveMemberDev(\'' + p.id + '\')" style="width:100%;margin-top:16px;padding:12px;background:linear-gradient(135deg,var(--gold),var(--wheat));border:none;border-radius:8px;color:#08090f;font-weight:700;font-size:.9rem;cursor:pointer;font-family:\'Cinzel\',serif">Kaydet</button>'
+    : '') +
+
+    '</div>';
+}
+
+async function saveMemberDev(userId) {
+  const fields = ['thesis_proposal', 'thesis', 'congresses', 'books', 'analyses_learned', 'notes'];
+  const dev = {};
+  fields.forEach(f => {
+    const el = document.getElementById('dev-' + f + '-' + userId);
+    if (el) dev[f] = el.value.trim();
+  });
+  const { error } = await sb.from('profiles').update({ development: dev }).eq('id', userId);
+  if (error) { showToast('Hata: ' + error.message); return; }
+  const profile = allProfiles.find(p => p.id === userId);
+  if (profile) profile.development = dev;
+  showToast('✓ Profil kaydedildi');
 }
 
 // HELPERS
