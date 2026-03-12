@@ -1016,7 +1016,11 @@ function renderHome() {
         </div>
         <div class="task-meta">
           <span class="priority-dot p-${t.priority||'medium'}"></span>
-          <span class="badge badge-muted">${t.type ? (ACADEMIC_LABELS[t.type]||t.type) : 'Görev'}</span>
+          <span class="badge badge-muted">${
+            t.type === 'makale' ? 'Makale' :
+            t.type === 'bildiri' ? 'Bildiri' :
+            t.type ? (ACADEMIC_LABELS[t.type]||t.type) : 'Görev'
+          }</span>
         </div>
       </div>`;
     }).join('');
