@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="logo.png"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
-<!-- v9 -->
+
 <style>
 :root {
   --bg: #08090f;
@@ -1311,11 +1311,11 @@ function renderMembers() {
           '<span class="badge badge-muted">📄 ' + pubs + ' Yayın</span>' +
         '</div>' +
         '<div style="display:flex;gap:6px">' +
-          '<button onclick="openMemberProfile('' + p.id + '')" style="flex:1;padding:8px;border-radius:8px;background:linear-gradient(135deg,var(--gold),var(--wheat));border:none;color:#08090f;font-weight:700;font-size:.8rem;cursor:pointer">Gelişim Profili</button>' +
-          '<button onclick="openDMFrom('' + p.id + '','members')" style="padding:8px 14px;border-radius:8px;background:transparent;border:1px solid var(--border2);color:var(--textDim);font-size:.8rem;cursor:pointer">💬</button>' +
+          '<button onclick="openMemberProfile(\'' + p.id + '\')" style="flex:1;padding:8px;border-radius:8px;background:linear-gradient(135deg,var(--gold),var(--wheat));border:none;color:#08090f;font-weight:700;font-size:.8rem;cursor:pointer">Gelişim Profili</button>' +
+          '<button onclick="openDMFrom(\'' + p.id + '\',\'members\')" style="padding:8px 14px;border-radius:8px;background:transparent;border:1px solid var(--border2);color:var(--textDim);font-size:.8rem;cursor:pointer">💬</button>' +
         '</div>'
       :
-        '<button onclick="openDMFrom('' + p.id + '','members')" style="width:100%;padding:8px;border-radius:8px;background:transparent;border:1px solid var(--border2);color:var(--textDim);font-size:.8rem;cursor:pointer">💬 Mesaj Gönder</button>'
+        '<button onclick="openDMFrom(\'' + p.id + '\',\'members\')" style="width:100%;padding:8px;border-radius:8px;background:transparent;border:1px solid var(--border2);color:var(--textDim);font-size:.8rem;cursor:pointer">💬 Mesaj Gönder</button>'
       ) +
     '</div>';
   }).join('');
